@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista de Tarefas</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <style>
+        body { font-family: Arial; margin: 40px; background: #f4f4f4; }
+        #root { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        ul { list-style: none; padding: 0; }
+        li { background: #fafafa; margin: 8px 0; padding: 10px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+        .completed { text-decoration: line-through; color: #888; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button { padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button.delete { background: #dc3545; }
+        button.edit { background: #ffc107; color: black; margin-right: 5px; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+    const API_URL = '/api/tasks';
+
+    function App() {
+        const [tasks, setTasks] = React.useState([]);
+        const [title, setTitle] = React.useState('');
+        const [description, setDescription] = React.useState('');
+        const [editingId, setEditingId] = React.useState(null);
+
+        React.useEffect(() => {
+            fetchTasks();
+        }, []);
+
+        const fetchTasks = async () => {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            setTasks(data);
+        };
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            if (!title.trim()) return;
+
+            const newTask = { title, description, completed: false };
+            if (editingId) {
+                // Update
+                await fetch(`${API_URL}/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...newTask, id: editingId })
+                });
+                setEditingId(null);
+            } else {
+                // Create
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newTask)
+                });
+            }
+            setTitle('');
+            setDescription('');
+            fetchTasks();
+        };
+
+        const toggleComplete = async (task) => {
+            await fetch(`${API_URL}/${task.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...task, completed: !task.completed })
+            });
+            fetchTasks();
+        };
+
+        const deleteTask = async (id) => {
+            if (window.confirm('Remover tarefa?')) {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                fetchTasks();
+            }
+        };
+
+        const editTask = (task) => {
+            setTitle(task.title);
+            setDescription(task.description);
+            setEditingId(task.id);
+        };
+
+        return (
+            <div>
+                <h1>Lista de Tarefas</h1>
+                <form onSubmit={handleSubmit}>
+                    <input
+                        type="text"
+                        placeholder="Título"
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                    />
+                    <textarea
+                        placeholder="Descrição (opcional)"
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                    />
+                    <button type="submit">{editingId ? 'Atualizar' : 'Adicionar'}</button>
+                    {editingId && <button type="button" onClick={() => { setTitle(''); setDescription(''); setEditingId(null); }}>Cancelar</button>}
+                </form>
+                <ul>
+                    {tasks.map(task => (
+                        <li key={task.id}>
+                            <div style={{ flex: 1 }}>
+                                <input
+                                    type="checkbox"
+                                    checked={task.completed}
+                                    onChange={() => toggleComplete(task)}
+                                />
+                                <span className={task.completed ? 'completed' : ''}>
+                                    <strong>{task.title}</strong> – {task.description}
+                                </span>
+                            </div>
+                            <div>
+                                <button className="edit" onClick={() => editTask(task)}>Editar</button>
+                                <button className="delete" onClick={() => deleteTask(task.id)}>Remover</button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>
